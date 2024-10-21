@@ -1,40 +1,49 @@
 # Libraries
 library(nflfastR)
 library(nflreadr)
-library(tidyverse)
+library(dplyr)
+library(stringr)
+library(tidyr)
 library(shiny)
 library(DT)
-# Load pbp and schedule data
-pbp_data <- load_pbp(1999:most_recent_season())
-sched_data <- load_schedules(1999:most_recent_season())
-# Get pbp data over all years in nflfastR data base
-pbp <- pbp_data %>%
-  # Get weather descriptions and sentiments
-  mutate(
-    weather_desc = str_extract(weather, "^[^T]*"),
-    # Detect if rainy/snowy/etc. conditions are the case, "bad" weather
-    weather_sentiment = ifelse(str_detect(weather_desc, regex("rain|showers|thunderstorms|snow|fog|cold|drizzle", ignore_case = TRUE)), "bad", "neutral"),
-    weather_sentiment = ifelse(str_detect(weather_desc, regex("sunny|clear|fair|warm", ignore_case = TRUE)), "good", weather_sentiment),
-    # Get generalized play types, and specificy a column for specific play types
-    exact_play_type = play_type,
-    play_type = ifelse(grepl("kickoff|punt|extra_point|field_goal", exact_play_type), "special_teams", 
-                       ifelse(grepl("pass|run", exact_play_type), "pass/rush", "misc/unidentified"))
-  ) %>%
-  # Select cols for data frame
-  select(game_id, season_type, season, week, weather_sentiment, qtr, down, play_type, penalty, penalty_type)
-# Get schedule data over date range
-referee <- sched_data %>%
-  # Create primetime and playoff dummy vars
-  mutate(primetime = ifelse((weekday %in% c("Monday", "Thursday", "Friday", "Saturday") | (weekday == "Sunday" & gametime == "20:20")), 1, 0),
-         playoff = ifelse(game_type != "REG", 1, 0),
-         primetime = ifelse(is.na(primetime), 0, primetime), playoff = ifelse(is.na(playoff), 0, playoff)) %>%
-  select(game_id, referee, primetime, playoff, home_team, away_team) # Select cols. 
-# Combine referee data w/ game data
-df <- left_join(pbp, referee, by = "game_id") %>% # Left join pbp data w/ ref, primetime/playoff vars, teams
-  # Change name misspelling for Bill Carolo, Adrian Hall
-  mutate(referee = ifelse(referee == "Bill Carolo", "Bill Carollo", referee),
-         referee = ifelse(referee == "Adrian Hall", "Adrian Hill", referee)) %>% 
-  filter(!is.na(referee)) # Remove NA referees and penalty types
+# Load in old pbp/sched data as a .rds file
+historical_data <- readRDS("historical_data_1999_2023.rds")
+create_data <- function(pbp_data, sched_data) { # Create a fcn that aggregates pbp and sched data
+  # Get pbp data over all years in nflfastR data base
+  pbp <- pbp_data %>%
+    # Get weather descriptions and sentiments
+    mutate(
+      weather_desc = str_extract(weather, "^[^T]*"),
+      # Detect if rainy/snowy/etc. conditions are the case, "bad" weather
+      weather_sentiment = ifelse(str_detect(weather_desc, regex("rain|showers|thunderstorms|snow|fog|cold|drizzle", ignore_case = TRUE)), "bad", "neutral"),
+      weather_sentiment = ifelse(str_detect(weather_desc, regex("sunny|clear|fair|warm", ignore_case = TRUE)), "good", weather_sentiment),
+      # Get generalized play types, and specificy a column for specific play types
+      exact_play_type = play_type,
+      play_type = ifelse(grepl("kickoff|punt|extra_point|field_goal", exact_play_type), "special_teams", 
+                         ifelse(grepl("pass|run", exact_play_type), "pass/rush", "misc/unidentified"))
+    ) %>%
+    # Select cols for data frame
+    select(game_id, season_type, season, week, weather_sentiment, qtr, down, play_type, penalty, penalty_type)
+  # Get schedule data over date range
+  referee <- sched_data %>%
+    # Create primetime and playoff dummy vars
+    mutate(primetime = ifelse((weekday %in% c("Monday", "Thursday", "Friday", "Saturday") | (weekday == "Sunday" & gametime == "20:20")), 1, 0),
+           playoff = ifelse(game_type != "REG", 1, 0),
+           primetime = ifelse(is.na(primetime), 0, primetime), playoff = ifelse(is.na(playoff), 0, playoff)) %>%
+    select(game_id, referee, primetime, playoff, home_team, away_team) # Select cols. 
+  # Combine referee data w/ game data
+  df <- left_join(pbp, referee, by = "game_id") %>% # Left join pbp data w/ ref, primetime/playoff vars, teams
+    # Change name misspelling for Bill Carolo, Adrian Hall
+    mutate(referee = ifelse(referee == "Bill Carolo", "Bill Carollo", referee),
+           referee = ifelse(referee == "Adrian Hall", "Adrian Hill", referee)) %>% 
+    filter(!is.na(referee)) # Remove NA referees and penalty types 
+  return(df) # Return df
+}
+# Pull data from 2024+ years
+pbp <- load_pbp(2024:most_recent_season())
+sched <- load_schedules(2024:most_recent_season())
+data <- create_data(pbp, sched) # Apply fn to return df
+df <- bind_rows(historical_data, data) # Use bind_rows fn to combine historical data
 # Aggregate data function 
 aggregate_data <- function(group_cols = NULL, yr1 = 1999, yr2 = most_recent_season(),
                            filter_col = NULL, filter_operator = NULL, filter_value = NULL) { 
@@ -240,7 +249,7 @@ ui <- navbarPage(
         p("This Shiny App sources data from nflfastR from 1999 until the current NFL season."),
         
         h3("Interpretation:"), # Why this shiny app
-        p("The goal of this Shiny App is to understand the general tendencies of all referees, in addition to how specific referees have called certain penalties, as well as how certain game situation affect their tendencies. nflfastR provides penalty data on each play since 1999, and nflreadr has the crew chief for each game since 1999. Using the data nflfastR and nflreadr provide, a user can find out and identify the tendencies for a referee with a variety of different filtration options, such as referee, time frame, penalties, and various game situation variables. This Shiny App can be extremely valuable in game planning for a specific crew chief, to identify prior penalty calling tendencies over their career, how they compare to other referees, and how they may have reffed in prior, recent games."),
+        p("The goal of this Shiny App is to understand the general tendencies of all referees, in addition to how specific referees have called certain penalties, as well as how certain game situation affect their tendencies. nflfastR provides penalty data on each play since 1999, and nflreadr has the crew chief for each game since 1999. Using the data nflfastR and nflreadr provide, a user can find out and identify the tendencies for a referee with a variety of different filtration options, such as referee, time frame, penalties, and various game situation variables. This Shiny App can be extremely valuable in game planning for a specific crew chief, to identify prior penalty calling tendencies over their career, how they compare to other referees, and how they may have reffed in prior, recent games. The data across this Shiny App includes the percentage of plays in which that penalty was called in addition to {penalty} +, which is the normalized version of penalty frequency - for example, a referee with a 150 penalty + calls penalties 50% more frequently than average, whereas a referee with 75 penalty + calls penalties 25% less frequently than average."),
         
         h3("How to use this Shiny App:"), # How to use this shiny app
         p("The tabs in this Shiny App are:"),
@@ -252,7 +261,7 @@ ui <- navbarPage(
         ),
         
         h3("Possible Limitations:"), # Describe where this shiny could be improved
-        p("While this Shiny App offers a way to evaluate referee tendencies, there are a variety of factors to take into account, in addition to ways to improve the analysis. For example, the data doesn't include information for which referee made which calls, it only provides the crew chief for that game. For certain games or seasons referee'd, it's likely that the frequency of penalties are a byproduct of the actions of the teams involved (whether that includes a higher or lower frequency of penalties). Additionally, just because a referee has a certain proclivity to (or not to) make a certain call, that doesn't mean it's the more likely case.")
+        p("While this Shiny App offers a way to evaluate referee tendencies, there are a variety of factors to take into account, in addition to ways to improve the analysis. For example, the data doesn't include information for which referee made which calls, it only provides the crew chief for that game. For certain games or seasons referee'd, it's likely that the frequency of penalties are a byproduct of the actions of the teams involved (whether that includes a higher or lower frequency of penalties). Additionally, just because a referee has a certain proclivity to (or not to) make a certain call, that doesn't mean it's the more likely case. While the leaderboards, reports, and game comparison tabs offer a lot of value to understand referee tendencies, the could all be improved and added upon. For example, a referee comparison tab, that lets you select two specific referees and compare how they call games.")
       )
     ),
     HTML('<div style="display: flex; justify-content: center; align-items: center; height: 100vh;"><img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/a2/National_Football_League_logo.svg/1024px-National_Football_League_logo.svg.png" style="max-width: 100%; max-height: 100%;"></div>')
@@ -263,8 +272,8 @@ ui <- navbarPage(
     id = "leaderboards",
     sidebarPanel( # Set leaderboards inputs, with values/choices
       selectInput("lead_group_cols", "Select Career/Season/Game for Aggregating Data:", choices = c("Career", "Season", "Game")),
-      sliderInput("lead_yr1", "Start Year:", value = 1999, min = 1999, max = most_recent_season(), sep = ""),
-      sliderInput("lead_yr2", "End Year:", value = most_recent_season(), min = 1999, max = most_recent_season(), sep = ""),
+      sliderInput("lead_yr1", "Start Year:", value = 1999, min = 1999, max = most_recent_season(), sep = "", step = 1),
+      sliderInput("lead_yr2", "End Year:", value = most_recent_season(), min = 1999, max = most_recent_season(), sep = "", step = 1),
       checkboxGroupInput("lead_penalty_cols", "Select Penalty Columns:", choices = penalty_types),
       selectInput("lead_filter", "Select Categorical Filter (can be left blank):", choices = c("", "home_team", "away_team", "weather_sentiment", "play_type", "exact_play_type", "qtr", "down", "playoff", "primetime")),
       selectInput("lead_operator", "Select Categorical Operator (can be left blank):", choices = c("", "==", "!=")),
@@ -281,8 +290,8 @@ ui <- navbarPage(
     id = "reports",
     sidebarPanel( # Set reports inputs, with values/choices
       selectInput("rep_group_cols", "Select Career/Season/Game for Aggregating Data:", choices = c("Career", "Season", "Game")),
-      sliderInput("rep_yr1", "Start Year:", value = 1999, min = 1999, max = most_recent_season(), sep = ""),
-      sliderInput("rep_yr2", "End Year:", value = most_recent_season(), min = 1999, max = most_recent_season(), sep = ""),
+      sliderInput("rep_yr1", "Start Year:", value = 1999, min = 1999, max = most_recent_season(), sep = "", step = 1),
+      sliderInput("rep_yr2", "End Year:", value = most_recent_season(), min = 1999, max = most_recent_season(), sep = "", step = 1),
       selectInput("ref", "Select Referee:", choices = sort(unique(df$referee))),
       checkboxGroupInput("rep_penalty_cols", "Select Penalty Columns:", choices = penalty_types),
       selectInput("rep_filter", "Select Categorical Filter (can be left blank):", choices = c("", "home_team", "away_team", "weather_sentiment", "play_type", "exact_play_type", "qtr", "down", "playoff", "primetime")), 
@@ -299,8 +308,8 @@ ui <- navbarPage(
     "Game Comparison",
     id = "game_reports",
     sidebarPanel( # Set game comparison inputs, with values/choices
-      sliderInput("gm_yr", "Select Season:", min = 1999, max = most_recent_season(), sep = "", value = 1999),
-      sliderInput("gm_wk", "Select Week", min = min(df$week), max = max(df$week), value = 1, step = TRUE),
+      sliderInput("gm_yr", "Select Season:", min = 1999, max = most_recent_season(), sep = "", value = 1999, step = 1),
+      sliderInput("gm_wk", "Select Week", min = min(df$week), max = max(df$week), value = 1, step = 1),
       selectInput("gm_game", "Select Game", choices = NULL),
       checkboxGroupInput("gm_penalty_cols", "Select Penalty Columns:", choices = penalty_types),
       selectInput("gm_filter", "Select Categorical Filter (can be left blank):", choices = c("", "home_team", "away_team", "weather_sentiment", "play_type", "exact_play_type", "qtr", "down", "playoff", "primetime")),
@@ -412,14 +421,6 @@ server <- function(input, output, session) {
     output$lookup <- renderDT({
       lookup_data()
     })
-  })
-  # Update (and change) input for referee names
-  observe({
-    filtered_df <- df %>% 
-      filter(season >= input$lead_yr1 & season <= input$lead_yr2) %>% 
-      arrange(referee)
-    # For referees in the season time frame update the input
-    updateSelectInput(session, "ref", choices = c("", unique(filtered_df$referee)), selected = NULL)
   })
   # Observe the input for the categorical filters on a page
   observe({
