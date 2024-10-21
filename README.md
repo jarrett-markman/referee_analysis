@@ -1,8 +1,6 @@
 # NFL Referee Analysis
 
-A Shiny App that provides users with the ability to analyze referee penalty tendencies in multiple different ways.
-
-[Link to Shiny App](https://jarrett-markman.shinyapps.io/referee-eval/)
+A Shiny App (deploying soon) that provides users with the ability to analyze referee penalty tendencies in multiple different ways.
 
 ### Data:
 This Shiny App sources data from nflfastR from 1999 until the current NFL season.
