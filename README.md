@@ -1,12 +1,14 @@
 # NFL Referee Analysis
 
-A Shiny App (deploying soon) that provides users with the ability to analyze referee penalty tendencies in multiple different ways.
+A Shiny App that provides users with the ability to analyze referee penalty tendencies in multiple different ways.
+
+Here is the link: [Link to Shiny](https://jarrett-markman.shinyapps.io/referee-eval/)
 
 ### Data:
-This Shiny App sources data from nflfastR from 1999 until the current NFL season.
+This Shiny App sources data from nflfastR from 2010 until 2023.
 
 ### Interpretation:
-The goal of this Shiny App is to understand the general tendencies of all referees, in addition to how specific referees have called certain penalties, as well as how certain game situation affect their tendencies. nflfastR provides penalty data on each play since 1999, and nflreadr has the crew chief for each game since 1999. Using the data nflfastR and nflreadr provide, a user can find out and identify the tendencies for a referee with a variety of different filtration options, such as referee, time frame, penalties, and various game situation variables. This Shiny App can be extremely valuable in game planning for a specific crew chief, to identify prior penalty calling tendencies over their career, how they compare to other referees, and how they may have reffed in prior, recent games. The data across this Shiny App includes the percentage of plays in which that penalty was called in addition to {penalty} +, which is the normalized version of penalty frequency - for example, a referee with a 150 penalty + calls penalties 50% more frequently than average, whereas a referee with 75 penalty + calls penalties 25% less frequently than average.
+The goal of this Shiny App is to understand the general tendencies of all referees, in addition to how specific referees have called certain penalties, as well as how certain game situation affect their tendencies. nflfastR provides penalty data on each play from 2010 to 2023, and nflreadr has the crew chief for each game since 2010. Using the data nflfastR and nflreadr provide, a user can find out and identify the tendencies for a referee with a variety of different filtration options, such as referee, time frame, penalties, and various game situation variables. This Shiny App can be extremely valuable in game planning for a specific crew chief, to identify prior penalty calling tendencies over their career, how they compare to other referees, and how they may have reffed in prior, recent games. The data across this Shiny App includes the percentage of plays in which that penalty was called in addition to {penalty} +, which is the normalized version of penalty frequency - for example, a referee with a 150 penalty + calls penalties 50% more frequently than average, whereas a referee with 75 penalty + calls penalties 25% less frequently than average.
 
 
 ### How to use this Shiny App:
